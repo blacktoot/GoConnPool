@@ -149,7 +149,7 @@ func (p *Pool) periodCleanExpiryConn() {
     p.conn = p.conn[index+1:]
     //deal expiry conn
     for _, v := range expiryConn {
-        v.conn = nil
+        p.close(v)
     }
     expiryNum := int32(index+1)
     atomic.AddInt32(&p.running, -expiryNum)
