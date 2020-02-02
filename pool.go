@@ -25,8 +25,22 @@ type connection struct {
     //start time
     expiry time.Time
 }
+
+//singleton get pool instance
+var (
+    once sync.Once
+    singleton *Pool
+    err error
+)
+func GetPoolInst(opt ...Options) (*Pool, error) {
+	once.Do(func() {
+		singleton, err = newPool(opt...)
+	})
+	return singleton, err
+}
+
 //new pool
-func NewPool(opt ...Options) (*Pool, error){
+func newPool(opt ...Options) (*Pool, error) {
     //default config
     configParam := config{
         initialSize : defaultInitialSize,
