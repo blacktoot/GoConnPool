@@ -3,6 +3,7 @@ import (
     "time"
     "net"
     "sync"
+    "sync/atomic"
 )
 
 //pool strcut 
@@ -14,7 +15,7 @@ type Pool struct {
     close func(interface{}) error
     conn []*connection
     addr string
-    running int //already apply num
+    running int32 //already apply num
     mutex sync.Mutex
 }
 
@@ -68,8 +69,9 @@ func NewPool(opt ...Options) (*Pool, error){
 				expiry : time.Now(),
 			}
             p.conn = append(p.conn, conn)
-            p.running += 1
+            atomic.AddInt32(&p.running, 1)
         }
+        go p.periodCleanExpiryConn()
         return p, nil
     }
 }
@@ -101,7 +103,8 @@ func(p *Pool) Get() (*connection, error) {
     }
 
     //conn is empty
-    if p.running >= p.maxNum {
+    runningNum := int(atomic.LoadInt32(&p.running))
+    if runningNum >= p.maxNum {
         return nil, poolOverload
     }
 
@@ -114,7 +117,7 @@ func(p *Pool) Get() (*connection, error) {
 	    conn : c,
 		expiry : time.Now(),
 	}
-    p.running += 1
+	atomic.AddInt32(&p.running, 1)
     return conn, err
 }
 
@@ -130,4 +133,25 @@ func(p *Pool) Put(c interface{}) error {
 	}
     p.conn = append(p.conn, conn)
     return nil
+}
+
+//period clean expiry conn
+func (p *Pool) periodCleanExpiryConn() {
+    //get expiry conn
+    expiry := p.expiryTime
+    t := time.Now().Add(-expiry)
+    p.mutex.Lock()
+    index := p.binSearch(t)
+    if index < 0 {
+		return
+    }
+    expiryConn := p.conn[:index+1]
+    p.conn = p.conn[index+1:]
+    //deal expiry conn
+    for _, v := range expiryConn {
+        v.conn = nil
+    }
+    expiryNum := int32(index+1)
+    atomic.AddInt32(&p.running, -expiryNum)
+    p.mutex.Unlock()
 }
