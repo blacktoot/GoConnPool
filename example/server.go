@@ -17,12 +17,16 @@ func main() {
 		    fmt.Println(err)
 			continue
 		}
-		data := make([]byte, 1024)
-		_, errConn := conn.Read(data)
-		if errConn != nil {
-		    fmt.Println(errConn)
-			continue
-		}
-		fmt.Println(string(data))
+		go dealConn(conn)
 	}
+}
+
+func dealConn(c net.Conn) {
+	data := make([]byte, 1024)
+	_, errConn := c.Read(data)
+	if errConn != nil {
+		fmt.Println(errConn)
+		return
+	}
+	fmt.Println(string(data))
 }
