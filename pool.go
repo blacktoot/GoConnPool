@@ -17,6 +17,7 @@ type Pool struct {
     addr string
     running int32 //already apply num
     mutex sync.Mutex
+    maxIdleNum int
 }
 
 type connection struct {
@@ -47,6 +48,7 @@ func newPool(opt ...Options) (*Pool, error) {
         maxSize : defaultMaxSize,
         expiryTime : defaultExpiryTime,
         addr : defaultAddr,
+        maxIdleNum : defaultMaxIdelNum,
     }
 
     for _, o := range opt {
@@ -62,8 +64,9 @@ func newPool(opt ...Options) (*Pool, error) {
         conn : make([]*connection, 0, configParam.maxSize),
         addr : configParam.addr,
         running : 0,
+        maxIdleNum : configParam.maxIdleNum,
     }
-    if p.initialNum <= 0 || p.maxNum <= 0 || p.initialNum > p.maxNum {
+    if p.initialNum <= 0 || p.maxNum <= 0 || p.initialNum > p.maxNum || p.maxIdleNum < 0{
         return nil, initialConfigErr
     } else if p.expiryTime <= 0 {
         return nil, expiryConfigErr
@@ -159,13 +162,22 @@ func (p *Pool) periodCleanExpiryConn() {
 	    if index < 0 {
 			return
 	    }
-	    expiryConn := p.conn[:index+1]
-	    p.conn = p.conn[index+1:]
+	    //maxIdleNum priority over expiryTime
+	    expiryConn := p.conn[:0]
+	    if len(p.conn[index+1:]) >= p.maxIdleNum {
+			expiryConn = p.conn[:index+1]
+	        p.conn = p.conn[index+1:]
+	    } else {
+	        validIndex := len(p.conn)-maxIdleNum
+			expiryConn = p.conn[:validIndex]
+			p.conn = p.conn[validIndex:]
+	    }
+	    
 	    //deal expiry conn
+	    expiryNum := len(expiryConn)
 	    for _, v := range expiryConn {
 	        p.close(v)
 	    }
-	    expiryNum := int32(index+1)
 	    atomic.AddInt32(&p.running, -expiryNum)
 	}
 }

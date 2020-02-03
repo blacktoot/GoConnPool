@@ -8,6 +8,7 @@ const (
     defaultMaxSize = 10
     defaultExpiryTime = 5*time.Second
     defaultAddr string = "127.0.0.1:8080"
+    defaultMaxIdleNum = 3
 )
 //pool config
 type config struct {
@@ -15,6 +16,7 @@ type config struct {
     maxSize int
     expiryTime time.Duration
     addr string
+    maxIdleNum int
 }
 
 //func option
@@ -42,4 +44,10 @@ func ConfigAddr(addr string) Options {
     return func(c *config) {
         c.addr = addr
     }
+}
+
+func ConfigMaxIdleNum(num int) Options {
+	return func(c *config) {
+		c.maxIdleNum = num
+	}
 }
